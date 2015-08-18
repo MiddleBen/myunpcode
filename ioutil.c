@@ -8,11 +8,3 @@
 void Readline(int fd) {
 
 }
-
-
-
-
------------------------------13786001695394449931479156003
-Content-Disposition: form-data; name="mode"
-
-formupload

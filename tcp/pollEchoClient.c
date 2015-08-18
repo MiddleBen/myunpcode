@@ -99,11 +99,3 @@ int main(int argc, char ** argv) {
 	}
 	select_cli(sockfd, stdin);
 }
-
-
-
-
------------------------------2038948564152181958093497486
-Content-Disposition: form-data; name="mode"
-
-formupload

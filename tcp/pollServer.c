@@ -118,8 +118,3 @@ int main(int argc, char *argv[]) {
 		};
 	}
 }
-
------------------------------20358744521867895155766958397
-Content-Disposition: form-data; name="mode"
-
-formupload

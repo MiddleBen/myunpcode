@@ -132,8 +132,3 @@ int main(int argc, char *argv[]) {
 		printf("select go to sleep3!\n");
 	}
 }
-
------------------------------1807583373328154241410201864
-Content-Disposition: form-data; name="mode"
-
-formupload
