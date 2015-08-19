@@ -131,8 +131,3 @@ int ReadLine(int fd, char *buf, size_t len) {
 	*temp = 0;
 	return n + 1;
 }
-
------------------------------4057237995973262705082722
-Content-Disposition: form-data; name="mode"
-
-formupload

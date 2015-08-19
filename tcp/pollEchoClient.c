@@ -68,7 +68,7 @@ void select_cli(int sockfd, FILE *file) {
 				printf("read end of socket! \n");
 				break;
 			} else {
-				printf("read %d bytes\n", n);
+				printf("read %d bytes, content is %s\n", n, buf);
 				readCount2 += n;
 			}
 			fputs(buf, stdout);

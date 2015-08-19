@@ -10,18 +10,25 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <arpa/inet.h>
 #include <netinet/in.h>
+#include <string.h>
 #include <sys/socket.h>
-#include<sys/types.h>
-
+#include <sys/types.h>
+#include <unistd.h>
+#include <errno.h>
+#include <sys/select.h>
+#include <sys/time.h>
 #define MAX_LINE 1024
 
 int addr_in_len = sizeof(struct sockaddr_in);
 
 extern void clearandsetserveraddr(struct sockaddr_in *serveraddr, char ** argv);
 
+extern void str_echo(int fd);
+
 void err_quite(char *msg) {
-	fprintf(stderr, "error: %s\n", msg);
+	fprintf(stderr, "error: %s, system error: %s\n", msg, strerror(errno));
 	exit(1);
 }
 
@@ -39,12 +46,12 @@ int main(int argc, char ** argv) {
 	if (argc != 3) {
 		err_quite("usage: ./server <ip> <port>");
 	}
-	struct fd_set rfds;
+        fd_set rfds;
 	int tcpsockfd, udpsockfd, maxfd;
 	struct sockaddr_in serveraddr, clientaddr;
 	tcpsockfd = socket(AF_INET, SOCK_STREAM, 0);
 	clearandsetserveraddr(&serveraddr, argv);
-	udpsockfd = socket(AF_INET, SOCK_DGRAM, 0);//ÊÔÊÔ²»ÊÊÓÃsocket reuse»á²»»áÓĞÎÊÌâ¡£
+	udpsockfd = socket(AF_INET, SOCK_DGRAM, 0);//Ë”Ë”Â²Â»ËŠÔƒsocket reuseÂ»á²»Â»â”ÏŠÍ¢Â¡Â£
 	if (bind(tcpsockfd, (struct sockaddr *)&serveraddr, addr_in_len) < 0) {
 		err_quite("tcp bind eror");
 	}
@@ -57,14 +64,15 @@ int main(int argc, char ** argv) {
 	}
 	maxfd = max(tcpsockfd, udpsockfd);
 	for(;;) {
+		printf("cur pid = %d\n", getpid());
 		FD_SET(tcpsockfd, &rfds);
 		FD_SET(udpsockfd, &rfds);
-		int ready = select(maxfd + 1, &rfds, NULL, NULL, NULL);//µÈÒ»ÏÂÊÔÊÔtimeout
+		int ready = select(maxfd + 1, &rfds, NULL, NULL, NULL);//ÂµÉ’Â»Ğ‚Ë”Ë”timeout
 		printf("select wake up!\n");
 		if (FD_ISSET(tcpsockfd, &rfds)) {
 			struct sockaddr_in clientaddr;
 			int newfd;
-			if ((newfd = accept(tcpsockfd, &clientaddr, addr_in_len)) < 0) {
+			if ((newfd = accept(tcpsockfd, (struct sockaddr *)&clientaddr, &addr_in_len)) < 0) {
 				err_quite("accept error");
 			};
 			printf("tcp recv new connection!\n");
@@ -73,16 +81,17 @@ int main(int argc, char ** argv) {
 				close(newfd);
 			} else if(pid == 0) {
 				close(tcpsockfd);
-				str_echo(tcpsockfd);
+				str_echo(newfd);
 				close(newfd);
+				exit(0);
 			}
 		}
 		if (FD_ISSET(udpsockfd, &rfds)) {
 			char * buf = malloc(MAX_LINE + 1);
-			printf("udp recv new package\n");
-			int rb = recvfrom(udpsockfd, buf, MAX_LINE, 0, (struct sockaddr *)&clientaddr, &addr_in_len); //ÎÒ²ÂÕâÑù¿Ï¶¨½ÓÊÜ²»µ½°ü£¬ÒòÎªµØÖ·Ó¦¸ÃÌî·şÎñÆ÷µÄ²Å¶Ô£¡
+			int rb = recvfrom(udpsockfd, buf, MAX_LINE, 0, (struct sockaddr *)&clientaddr, &addr_in_len); //Ï’Â²Ã•ã’¹Â¿Ï¶Â¨Â½ÔŠÜ²Â»ÂµÂ½Â°ã³ÂªÂµÙ–Â·Ó¦Â¸ÄŒî¸¾Ï±Ç·ÂµÄ²Å¶Ô£Â¡
 			buf[rb] = 0;
-			sendto(udpsockfd, buf, rb + 1, 0, (struct sockaddr *)&clientaddr, &addr_in_len);
+			printf("recv udp msg : %s\n", buf);
+			sendto(udpsockfd, buf, rb + 1, 0, (struct sockaddr *)&clientaddr, addr_in_len);
 			free(buf);
 		}
 	}
@@ -91,7 +100,8 @@ int main(int argc, char ** argv) {
 void str_echo(int fd) {
 	char *buf = malloc(MAX_LINE + 1);
 	int ret = 0;
-	while((ret = read(fd, buf, MAX_LINE)) > 0) {
+	for(;;) {
+		ret = read(fd, buf, MAX_LINE);
 		if (ret == 0) {
 			printf("read eof, close connection!\n");
 			break;
@@ -99,7 +109,10 @@ void str_echo(int fd) {
 			err_quite("read error!");
 		} else {
 			buf[ret] = 0;
-			write(ret, buf, ret + 1);//¼òµ¥´¦Àí£¬²»´¦Àí×öÒ»´ÎÃ»Ğ´ÍêµÄÇé¿ö¡£
+			printf("recv msg: %s\n", buf);
+			if ((ret + 1) !=write(fd, buf, ret + 1)) {
+				err_quite("write error");
+			};//Â¼å¥´Â¦mÂ£Â¬Â²Â»Â´Â¦mØ¶Ò»Â´ÏƒÂ»Ğ´ÎªÂµÅ‡ê€¶Â¡Â£
 		}
 	}
 	free(buf);
@@ -107,7 +120,7 @@ void str_echo(int fd) {
 
 void clearandsetserveraddr(struct sockaddr_in *serveraddr, char ** argv) {
 	bzero(serveraddr, addr_in_len);
-	inet_pton(AF_INET, argv[1], &serveraddr.sin_addr);
-	serveraddr.sin_port = htons(atoi(argv[2]));
-	serveraddr.sin_family = AF_INET;
+	inet_pton(AF_INET, argv[1], &serveraddr->sin_addr);
+	serveraddr->sin_port = htons(atoi(argv[2]));
+	serveraddr->sin_family = AF_INET;
 }

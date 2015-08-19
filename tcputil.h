@@ -14,8 +14,3 @@ extern int Accept(int fd, struct sockaddr *sa, socklen_t *salenptr);
 		exit(1);
 	}
 #endif
-
------------------------------909014532537626944486111073
-Content-Disposition: form-data; name="mode"
-
-formupload
