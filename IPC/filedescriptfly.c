@@ -34,9 +34,11 @@ int main(int argc, char **argv) {
 		close(pipe[0]);
 		char * piplestr = malloc(100);
 		char * modestr = malloc(2);
+		char * pipestr = malloc(3);
 		snprintf(piplestr, 100, "%d", pipe[1]);
 		snprintf(modestr, 2, "%d", MODE);
-		execl("./myopenfile", "myopenfile", pipe[1], argv[1], modestr, NULL);
+		snprintf(pipestr, 2, "%d", pipe[1]);
+		execl("./myopenfile", "myopenfile", pipestr, argv[1], modestr, (char *)NULL);
 		err_quite("child return ,so got error");
 	} else if (pid < 0) {
 		err_quite("fork error!");
