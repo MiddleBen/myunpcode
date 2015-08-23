@@ -12,11 +12,17 @@
 #include <sys/stat.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+#include <signal.h>
 #define CMSGLEN CMSG_LEN(sizeof(int))
 void err_quite(char *msg) {
 	fprintf(stderr, "error: %s, %s\n", msg, strerror(errno));
 	exit(1);
 }
+void sigpipehandle(int val) {
+	printf("catch sig pipe !\n");
+}
+
 extern void sendfd(int pipefd, int sentfd);
 int main(int argc, char **argv) {
 	if (argc != 4) {
@@ -24,18 +30,26 @@ int main(int argc, char **argv) {
 	}
 	int i = 0;
 	for(; i < argc; i++) {
-		printf("argv[%d]=%s", i, argv[i]);
+		printf("argv[%d]=%s\t", i, argv[i]);
 	}
 	printf("\n");
+	struct sigaction act;
+	bzero(&act, sizeof(act));
+	act.sa_handler = sigpipehandle;
+	sigaction(SIGPIPE, &act, NULL);
 	int mode = atoi(argv[3]);
 	int pipefd = atoi(argv[1]);
-	int fd = open(argv[2], mode, 0);
+	int fd = open(argv[2], O_RDONLY , mode);
 	if (fd < 0) {
 		err_quite("open file error!");
 	}
 	sendfd(pipefd, fd);
-	exit(EXIT_FAILURE);
+	exit(0);
 }
+void Exception(void)
+ {
+     printf("出现异常！\n");
+ }
 
 void sendfd(int pipefd, int sentfd) {
 	char iobuf[2];
@@ -60,8 +74,14 @@ void sendfd(int pipefd, int sentfd) {
 	cmsghdr.cmsg_type = SCM_RIGHTS;
 	cmsghdr.cmsg_len = CMSGLEN;
 	*(int *) CMSG_DATA(&cmsghdr) = sentfd;
+	printf("begin to send fd: %d\n", sentfd);
+	if (atexit(Exception) <0) {
+		err_quite("at exit error");
+	}
 	if (sendmsg(pipefd, &smsghdr, 0) < 0) {
+		atexit(Exception);
 		err_quite("sendmsg error");
 	}
+	printf("end to sendfd\n");
 }
 
