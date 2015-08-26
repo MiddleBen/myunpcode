@@ -12,12 +12,25 @@
 #include<sys/types.h>
 #include<sys/epoll.h>
 #include"../tcputil.h"
+#include<sys/fcntl.h>
 #include<poll.h>
 #define MAX_FD 2
 #define MAX_LINE 5
+extern void str_echo(int fd);
 void error_quit(char *msg) {
 	printf("line %d error: %s, errno: %s\n", __LINE__, msg, strerror(errno));
 	exit(1);
+}
+
+int setNoneBlock(int fd) {
+	int opt = fcntl(fd, F_GETFL);
+	if (opt < 0) {
+		error_quit("fcntl get error");
+	}
+	opt |= O_NONBLOCK;
+	if (fcntl(fd, F_SETFL, opt) < 0) {
+		error_quit("fcntl set error");
+	}
 }
 int max(int fd1, int fd2) {
 	if (fd1 == fd2) {
@@ -36,7 +49,8 @@ int main(int argc, char *argv[]) {
 	}
 	int sockfd, listenfd;
 	int curMaxFd = 0;
-	struct pollfd pfds[MAX_FD];
+	int epollfd;
+	struct epoll_event evt, events[MAX_FD];
 	struct sockaddr_in serverSockAddr, clientAddr;
 	memset(&serverSockAddr, 0, sizeof(serverSockAddr));
 	inet_pton(AF_INET, argv[1], &(serverSockAddr.sin_addr));
@@ -50,72 +64,60 @@ int main(int argc, char *argv[]) {
 	if (listen(sockfd, 10) < 0) {
 		error_quit("listen error");
 	};
-	pfds[0].fd = sockfd;
-	pfds[0].events = POLLRDNORM;
-	int temp = 1;
-	for (; temp < MAX_FD; temp++) {
-		pfds[temp].fd = -1;
+	epollfd = epoll_create(10);
+	if (epollfd == -1) {
+		error_quit("epoll create error");
 	}
-	int nfds = 0;
+	evt.events = EPOLLIN;
+	evt.data.fd = sockfd;
+	epoll_ctl(epollfd, EPOLL_CTL_ADD, sockfd, &evt);
 	for (;;) {
 		int ready = 0;
-		if((ready = poll(pfds, nfds + 1, -1)) < 0) {
-			error_quit("poll error!");
+		if ((ready = epoll_wait(epollfd, events, MAX_FD, -1)) < 0) {
+			error_quit("epoll_wait error!");
 		} else {
-			printf("poll wake up!\n");
+			printf("epoll wake up!\n");
 		}
-		if (pfds[0].revents && POLLRDNORM) {
-			int newfd;
-			int len = sizeof(clientAddr);
-			if ((newfd = accept(sockfd, (struct sockaddr *) &clientAddr, &len))
-					< 0) {
-				printf("new connection but accept error!");
-			}
-			printf("new connection! fd is %d\n", newfd);
-			int i;
-			for (i = 1; i < MAX_FD; i++) {
-				if (pfds[i].fd == -1) {
-					pfds[i].fd = newfd;
-					pfds[i].events = POLLRDNORM;
-					break;
+		int i = 0;
+		for (i = 0; i < ready; i++) {
+			if (events[i].data.fd == sockfd && events[i].events && EPOLLIN) {
+				int addrsize = sizeof(clientAddr);
+				int newfd;
+				if ((newfd = accept(sockfd, (struct sockaddr*)&clientAddr, &addrsize)) < 0) {
+					err_quite("accept error!");
 				}
-			}
-			if (i >= MAX_FD) { // 如果大于最大连接数了
-				error_quit("max connections reach!");
-			}
-			if (i > nfds) {
-				nfds = i;
-			}
-			if ((--ready) == 0) {
-				printf("poll go to wait1!\n");
-				continue;
-			}
-		};
-		int i;
-		for (i = 1; i < MAX_FD; i++) {
-			int curfd = pfds[i].fd;
-			if (curfd != -1) {
-				if (pfds[i].revents && POLLRDNORM) {
-					printf("curfd: %d reading..\n", curfd);
-					bool eofflag = false;
-					int rall =ReadLine(curfd, buf, MAX_LINE);
-					printf("read: %d bytes\n", rall);
-					if (rall == 0) { //eof or err;
-						close(curfd);
-						pfds[i].fd = -1;
-						continue;
-					}
-					if (write(curfd, buf, strlen(buf)) != strlen(buf)) {
-						error_quit("simple write error!");
-					} else {
-						printf("write %s, %d bytes\n", buf, (int) strlen(buf));
-					}
-					if ((--ready) == 0) {
-						printf("poll go to wait2!\n");
-						break;
-					}
+				printf("new connection!\n");
+				setNoneBlock(newfd);
+				evt.events = EPOLLIN || EPOLLET;
+				evt.data.fd = newfd;
+				if (epoll_ctl(epollfd, EPOLL_CTL_ADD, newfd, &evt) < 0) {
+					error_quit("epoll ctl add error");
 				}
-			};
-		};
+			} else if (events[i].events && EPOLLIN){
+					str_echo(events[i].data.fd);
+			}
+		}
 	}
 }
+
+void str_echo(int fd) {
+	char *buf = malloc(MAX_LINE + 1);
+	int ret = 0;
+		ret = read(fd, buf, MAX_LINE);
+		if (ret == 0) {
+			printf("read eof, close connection!\n");
+			close(fd);
+		} else if (ret < 0) {
+			printf("fd = %d\n", fd);
+			err_quite("read error!");
+		} else {
+			buf[ret] = 0;
+			printf("fd = %d, server read: %s\n", fd, buf);
+			int wrt = write(fd, buf, ret + 1); //¼òµ¥´¦Àí£¬²»´¦Àí×öÒ»´ÎÃ»Ð´ÍêµÄÇé¿ö¡£
+			if (wrt != ret + 1) {
+				err_quite("write error!");
+			}
+	}
+	free(buf);
+}
+
