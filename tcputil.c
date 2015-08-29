@@ -12,6 +12,22 @@
 #include<stdio.h>
 #include<stdlib.h>
 #include<arpa/inet.h>
+#include<fcntl.h>
+#include<unistd.h>
+
+void error_quite(char *msg) {
+	printf("line %d error: %s, errno: %s\n", __LINE__, msg, strerror(errno));
+	exit(1);
+}
+
+int Connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen) {
+	int ret;
+	if ((ret = connect(sockfd, addr, addrlen)) != 0) {
+		error_quite("connect error!");
+	}
+	return ret;
+}
+
 void
 Close(int fd)
 {
