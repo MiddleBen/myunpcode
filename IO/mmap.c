@@ -41,13 +41,16 @@ int main(int argc, char **argv) {
 	}
 	close(fd);
 	printf("content: %s\n", addr);
-	addr[20] = '*';
-	if (msync(addr, filesize, MS_SYNC) != 0) {
+	addr[20] = '{';
+	printf("sleeping ...\n");
+	sleep(10);
+	printf("wake up!\n");
+	/**if (msync(addr, filesize, MS_SYNC) != 0) {
 		error_quite("msync error!");
 	}
 	if (munmap(addr, filesize) < 0) {
 		error_quite("munmap error");
-	}
+	}**/
 	exit(EXIT_SUCCESS);
 }
 
