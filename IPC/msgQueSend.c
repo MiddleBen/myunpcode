@@ -1,7 +1,10 @@
 #include <sys/types.h>
 #include <sys/ipc.h>
-#include　<sys/msg.h>
+#include <sys/msg.h>
+#include <unistd.h>
 #include <stdio.h>
+#include <strings.h>
+#include <stdlib.h>
 #include <errno.h>
 #define MSG_SIZE 20
 /**
@@ -18,30 +21,30 @@ int main () {
 	struct MYMSG msg;
 	struct msqid_ds msginfo;
 	size_t msgsz = sizeof(struct MYMSG);
-	if ((msqid = msgget(key, O_CREAT | O_EXCL)) < 0) {
+	if ((msqid = msgget(key, IPC_CREAT | 0600)) < 0) {
 		perror("msgget error");
 	}
 	bzero(&msg, msgsz);
 	msg.msgid = 007;
-	msg.msgtext = "hello, i am 007";
+	sprintf(msg.msgtext, "%s", "hello, i am 007");
 	if (msgsnd(msqid, &msg, msgsz, IPC_NOWAIT) < 0) {
 		perror("send msg to queue error!");
 	}
 	bzero(&msg, msgsz);
 	msg.msgid = 006;
-	msg.msgtext = "hello, i am 006";
+	sprintf(msg.msgtext, "%s", "hello, i am 006");
 	if (msgsnd(msqid, &msg, msgsz, IPC_NOWAIT) < 0) {
 			perror("send msg to queue error!");
 	}
 	bzero(&msg, msgsz);
 	msg.msgid = 006;
-	msg.msgtext = "hello, i am 006 tow";
+	sprintf(msg.msgtext, "%s", "hello, i am 006 tow");
 	if (msgsnd(msqid, &msg, msgsz, IPC_NOWAIT) < 0) {
 			perror("send msg to queue error!");
 	}
-	if (msgctl(msqid, IPC_INFO, &msginfo) < 0) {
+	if (msgctl(msqid, IPC_STAT, &msginfo) < 0) {
 		perror("msgctl error!");
 	}
-	printf("send queue has %d msgs with %d bytes\n", msginfo.msg_qnum, msginfo.__msg_cbytes);
+	printf("send queue has %ld msgs with %ld bytes\n", msginfo.msg_qnum, msginfo.__msg_cbytes);
 	exit(0);
 }

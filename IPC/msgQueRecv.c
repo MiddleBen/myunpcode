@@ -1,8 +1,11 @@
 #include <sys/types.h>
 #include <sys/ipc.h>
-#include　<sys/msg.h>
+#include <unistd.h>
+#include <sys/msg.h>
 #include <stdio.h>
 #include <errno.h>
+#include <stdlib.h>
+#include <strings.h>
 /**
  * 使用消息队列接收数据
  */
@@ -18,30 +21,30 @@ int main() {
 	struct MYMSG msg;
 	struct msqid_ds msginfo;
 	size_t msgsz = sizeof(struct MYMSG);
-	if ((msqid = msgget(key, O_EXCL)) < 0) {
+	if ((msqid = msgget(key, IPC_CREAT | 0600)) < 0) {
 			perror("msgget error");
 	}
-	if (msgctl(msqid, IPC_INFO, &msginfo) < 0) {
+	if (msgctl(msqid, IPC_STAT, &msginfo) < 0) {
 		perror("msgctl error!");
 	}
-	printf("recv queue has %d msgs with %d bytes\n", msginfo.msg_qnum,
+	printf("recv queue has %ld msgs with %ld bytes\n", msginfo.msg_qnum,
 			msginfo.__msg_cbytes);
 	bzero(&msg, msgsz);
-	if (msgrcv(msgid, &msg, msgsz, 007, IPC_NOWAIT) < 0) {
+	if (msgrcv(msqid, &msg, msgsz, 007, IPC_NOWAIT) < 0) {
 		perror("msg recv error!");
 	}
 	printf("msg.msgid = %ld\n", msg.msgid);
 	printf("msg.msgtext = %s\n", msg.msgtext);
 
 	bzero(&msg, msgsz);
-	if (msgrcv(msgid, &msg, msgsz, 0, IPC_NOWAIT) < 0) {
+	if (msgrcv(msqid, &msg, msgsz, 0, IPC_NOWAIT) < 0) {
 		perror("msg recv error!");
 	}
 	printf("msg.msgid = %ld\n", msg.msgid);
 	printf("msg.msgtext = %s\n", msg.msgtext);
 
 	bzero(&msg, msgsz);
-	if (msgrcv(msgid, &msg, msgsz, 006, IPC_NOWAIT) < 0) {
+	if (msgrcv(msqid, &msg, msgsz, 006, IPC_NOWAIT) < 0) {
 		perror("msg recv error!");
 	}
 	printf("msg.msgid = %ld\n", msg.msgid);
