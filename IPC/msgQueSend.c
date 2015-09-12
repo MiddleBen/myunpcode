@@ -21,7 +21,7 @@ int main () {
 	struct MYMSG msg;
 	struct msqid_ds msginfo;
 	size_t msgsz = sizeof(struct MYMSG);
-	if ((msqid = msgget(key, IPC_CREAT | 0600)) < 0) {
+	if ((msqid = msgget(key, IPC_CREAT | 0700)) < 0) {
 		perror("msgget error");
 	}
 	bzero(&msg, msgsz);
