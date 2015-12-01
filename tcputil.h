@@ -7,6 +7,8 @@
 #define	MAXLINE	4096
 extern int Tcp_listen(const char* host, const char *serv);
 extern int Accept(int fd, struct sockaddr *sa, socklen_t *salenptr);
+extern void error_quite(char *msg);
+extern int Connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
 #ifndef eq
 #define eq
 	void err_quite(const char *msg) {

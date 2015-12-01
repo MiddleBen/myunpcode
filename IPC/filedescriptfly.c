@@ -28,15 +28,17 @@ int main(int argc, char **argv) {
 	int childstatus;
 	int pipe[2];
 	bzero(&rmsghdr, sizeof(struct msghdr));
-	int pid = fork();
 	socketpair(AF_UNIX, SOCK_STREAM, 0, pipe);
+	int pid = fork();
 	if (pid == 0) {
 		close(pipe[0]);
 		char * piplestr = malloc(100);
 		char * modestr = malloc(2);
+		char * pipestr = malloc(3);
 		snprintf(piplestr, 100, "%d", pipe[1]);
 		snprintf(modestr, 2, "%d", MODE);
-		execl("./myopenfile", "myopenfile", pipe[1], argv[1], modestr, NULL);
+		snprintf(pipestr, 2, "%d", pipe[1]);
+		execl("./myopenfile", "myopenfile", pipestr, argv[1], modestr, (char *)NULL);
 		err_quite("child return ,so got error");
 	} else if (pid < 0) {
 		err_quite("fork error!");
@@ -44,9 +46,9 @@ int main(int argc, char **argv) {
 		close(pipe[1]);
 		printf("waiting for child open file!\n");
 		waitpid(pid, &childstatus, 0);
-		printf("wake up!\n");
-		if (WIFEXITED(childstatus) != true) {
-			err_quite("child process return error！");
+		printf("wake up and WIFEXITED(childstatus)=%d\n", WIFEXITED(childstatus));
+		if (WIFEXITED(childstatus) == 0) {
+			err_quite("child did not terminal！");
 		}
 		int openfd;
 		readfd(pipe[0], &openfd);
@@ -57,15 +59,21 @@ int main(int argc, char **argv) {
 				err_quite("read error");
 			} else if (rt == 0) {
 				printf("read eof");
+				break;
 			} else {
 				buf[MAX_LINE] = 0;
 				printf("read content: %s", buf);
 			}
 		}
+		exit(0);
 	}
 }
 
 void readfd(int pipefd, int *fd) {
+	union {
+		struct cmsghdr cm;
+		char control[CMSG_SPACE(sizeof(int))];
+	} control_un;
 	char *iobuf[2];
 	struct iovec iov[1];
 	iov[0].iov_base = iobuf;
@@ -73,22 +81,18 @@ void readfd(int pipefd, int *fd) {
 	struct msghdr rmsghdr;
 	struct cmsghdr *cmsghdr;
 	bzero(&rmsghdr, sizeof(rmsghdr));
-	bzero(cmsghdr, sizeof(struct cmsghdr));
+	bzero(&cmsghdr, sizeof(struct cmsghdr));
 	//初始化消息头
 	rmsghdr.msg_iov = iov;
 	rmsghdr.msg_iovlen = 1;
 	rmsghdr.msg_name = NULL;
 	rmsghdr.msg_namelen = 0;
-	rmsghdr.msg_control = cmsghdr;
+	rmsghdr.msg_control = control_un.control; //注意为什么这里如果直接：malloc(CMSG_SPACE(sizeof(int))),就无法获取控制消息呢！
 	rmsghdr.msg_controllen = CMSG_SPACE(sizeof(int));
-	//初始化控制消息头
-	cmsghdr->cmsg_level = SOL_SOCKET;
-	cmsghdr->cmsg_type = SCM_RIGHTS;
-	cmsghdr->cmsg_len = CMSGLEN;
 	if (recvmsg(pipefd, &rmsghdr, 0) < 0) {
 		err_quite("sendmsg error");
 	}
 	cmsghdr = CMSG_FIRSTHDR(&rmsghdr);
-	fd = (int *) CMSG_DATA(cmsghdr);
+	*fd = *(int *) CMSG_DATA(cmsghdr);
 	printf("get fd: %d\n", *fd);
 }
