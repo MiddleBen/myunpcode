@@ -117,7 +117,7 @@ int main(int argc, char *argv[])
   {
    case  0 : break;
    case 'f': force=1;break;
-   case 'r': force_reload=1;break; 
+   case 'r': force_reload=1;break;
    case '9': http10=0;break;
    case '1': http10=1;break;
    case '2': http10=2;break;
@@ -162,7 +162,7 @@ int main(int argc, char *argv[])
  fprintf(stderr,"Webbench - Simple Web Benchmark "PROGRAM_VERSION"\n"
 	 "Copyright (c) Radim Kolar 1997-2004, GPL Open Source Software.\n"
 	 );
- build_request(argv[optind]);
+ build_request(argv[optind]); //返回例子："GET / HTTP/1.0\r\nUser-Agent: WebBench 1.5\r\nHost: www.baidu.com\r\n\r\n"。 后面是字符串信息： '\000' <repeats 1982 times>
  /* print bench info */
  printf("\nBenchmarking: ");
  switch(method)
